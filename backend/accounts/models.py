@@ -6,10 +6,11 @@ class CustomUser(AbstractUser):
     auth_token = models.CharField(max_length=100, blank=True)
 
 class Product(models.Model):
+    seller = models.ForeignKey(CustomUser, on_delete=models.CASCADE, null=True, blank=True)
     name = models.CharField(max_length=255)
     description = models.TextField()
     price = models.DecimalField(max_digits=10, decimal_places=2)
-    image_url = models.URLField(max_length=500, blank=True) # Photo link storage
+    image = models.ImageField(upload_to='products/', null=True, blank=True)
     stock = models.IntegerField(default=10)
 
     def __str__(self):

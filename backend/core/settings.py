@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-your-secret-key'
@@ -47,3 +48,6 @@ EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = 'venjocpsu@gmail.com'
 EMAIL_HOST_PASSWORD = 'llcd jfiu aokw fsjg'
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
