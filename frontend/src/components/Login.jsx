@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import { useNavigate, Link } from 'react-router-dom';
-import { LogIn, User, Lock } from 'lucide-react';
+import { User, Lock, ArrowRight, ShieldCheck } from 'lucide-react';
+
+const API = "http://127.0.0.1:8000/api";
 
 export default function Login({ setUser }) {
   const [form, setForm] = useState({ username: '', password: '' });
@@ -10,7 +12,7 @@ export default function Login({ setUser }) {
   const handleLogin = async (e) => {
     e.preventDefault();
     try {
-      const res = await axios.post("http://127.0.0.1:8000/api/login/", form);
+      const res = await axios.post(`${API}/login/`, form);
       localStorage.setItem('user', res.data.username);
       setUser(res.data.username);
       navigate('/');
@@ -20,31 +22,59 @@ export default function Login({ setUser }) {
   };
 
   return (
-    <div className="min-h-screen bg-[#7d86d5] flex items-center justify-center p-6 font-sans">
-      <div className="bg-white p-10 rounded-[40px] shadow-2xl w-full max-w-md border border-white/20">
-        <div className="text-center mb-10">
-          
-          <h1 className="text-4xl font-black text-[#2c3e50] italic tracking-tighter">TASKER PRO</h1>
-          <p className="text-[#7d86d5] font-black uppercase text-[10px] tracking-[0.2em] mt-2">Make your Task easy.</p>
+    <div className="min-h-screen bg-[#fff1f2] flex items-center justify-center p-6 font-sans">
+      <div className="bg-white p-10 md:p-14 rounded-[50px] shadow-2xl w-full max-w-md border border-pink-100 relative overflow-hidden">
+        {/* Decorative Background Element */}
+        <div className="absolute -top-10 -right-10 w-32 h-32 bg-pink-50 rounded-full opacity-50" />
+        
+        <div className="text-center mb-10 relative z-10">
+          <div className="w-16 h-16 bg-pink-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-pink-200 rotate-3">
+            <ShieldCheck className="text-white" size={32} />
+          </div>
+          <h1 className="text-4xl font-black text-slate-900 italic tracking-tighter uppercase leading-none">
+            HEX<span className="text-pink-600">SHOP</span>
+          </h1>
+          <p className="text-slate-400 font-bold uppercase text-[9px] tracking-[0.3em] mt-3">Welcome Back</p>
         </div>
 
-        <form onSubmit={handleLogin} className="space-y-4">
-          <div className="relative">
-            <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={20} />
-            <input className="w-full pl-12 pr-4 py-4 bg-slate-50 rounded-2xl border border-slate-100 outline-none focus:border-[#7d86d5] transition-all text-sm font-medium" placeholder="Username" onChange={e => setForm({...form, username: e.target.value})} required />
+        <form onSubmit={handleLogin} className="space-y-4 relative z-10">
+          <div className="group transition-all">
+            <label className="text-[10px] font-black uppercase text-slate-400 ml-4 mb-1 block tracking-widest">Identify</label>
+            <div className="relative">
+              <User className="absolute left-5 top-1/2 -translate-y-1/2 text-pink-300 group-focus-within:text-pink-600 transition-colors" size={18} />
+              <input 
+                className="w-full pl-14 pr-6 py-5 bg-pink-50/30 rounded-[24px] border-2 border-transparent outline-none focus:border-pink-200 focus:bg-white transition-all text-sm font-bold text-slate-800 placeholder:text-slate-300" 
+                placeholder="Username" 
+                onChange={e => setForm({...form, username: e.target.value})} 
+                required 
+              />
+            </div>
           </div>
-          <div className="relative">
-            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={20} />
-            <input className="w-full pl-12 pr-4 py-4 bg-slate-50 rounded-2xl border border-slate-100 outline-none focus:border-[#7d86d5] transition-all text-sm font-medium" type="password" placeholder="Password" onChange={e => setForm({...form, password: e.target.value})} required />
+
+          <div className="group transition-all">
+            <label className="text-[10px] font-black uppercase text-slate-400 ml-4 mb-1 block tracking-widest">Security</label>
+            <div className="relative">
+              <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-pink-300 group-focus-within:text-pink-600 transition-colors" size={18} />
+              <input 
+                className="w-full pl-14 pr-6 py-5 bg-pink-50/30 rounded-[24px] border-2 border-transparent outline-none focus:border-pink-200 focus:bg-white transition-all text-sm font-bold text-slate-800 placeholder:text-slate-300" 
+                type="password" 
+                placeholder="••••••••" 
+                onChange={e => setForm({...form, password: e.target.value})} 
+                required 
+              />
+            </div>
           </div>
-          <button className="w-full bg-[#7d86d5] text-white py-4 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-[#2c3e50] transition-all shadow-xl shadow-[#7d86d5]/30">
-            Sign In
+
+          <button className="w-full bg-slate-900 text-white py-5 rounded-[24px] font-black uppercase text-xs tracking-[0.2em] hover:bg-pink-600 transition-all shadow-2xl shadow-pink-100 flex items-center justify-center gap-3 mt-4 active:scale-95">
+            Sign In <ArrowRight size={16} />
           </button>
         </form>
 
-        <p className="text-center mt-8 text-[11px] font-black text-slate-400 uppercase tracking-wider">
-          New here? <Link to="/signup" className="text-[#7d86d5] ml-1 hover:underline">Create Account</Link>
-        </p>
+        <div className="text-center mt-10">
+          <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">
+            New here? <Link to="/signup" className="text-pink-500 ml-1 hover:text-pink-700 transition-colors underline decoration-2 underline-offset-4">Join HexShop</Link>
+          </p>
+        </div>
       </div>
     </div>
   );
