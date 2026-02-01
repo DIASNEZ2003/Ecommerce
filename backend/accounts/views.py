@@ -5,14 +5,19 @@ from rest_framework.response import Response
 from rest_framework.decorators import api_view
 from rest_framework import status
 from django.contrib.auth import authenticate
-from .models import CustomUser, Task
+from .models import CustomUser, Product, Cart, Order
 
-# --- REGISTRATION & LOGIN (Keep your existing ones) ---
+# --- AUTHENTICATION ---
 
 @api_view(['POST'])
 def register_user(request):
     data = request.data
-    user = CustomUser.objects.create_user(username=data['username'], email=data['email'], password=data['password'], is_active=False)
+    user = CustomUser.objects.create_user(
+        username=data['username'], 
+        email=data['email'], 
+        password=data['password'], 
+        is_active=False
+    )
     token = str(uuid.uuid4())
     user.auth_token = token
     user.save()
@@ -40,43 +45,47 @@ def login_user(request):
         return Response({'username': user.username})
     return Response({'error': 'Invalid'}, status=400)
 
-# --- THE TASK CRUD LOGIC ---
+# --- E-COMMERCE LOGIC ---
+
+@api_view(['GET'])
+def get_products(request):
+    products = Product.objects.all().values('id', 'name', 'description', 'price', 'image_url', 'stock')
+    return Response(list(products))
 
 @api_view(['GET', 'POST'])
-def handle_tasks(request, username):
-    user = CustomUser.objects.get(username=username)
+def manage_cart(request, username):
+    try:
+        user = CustomUser.objects.get(username=username)
+    except CustomUser.DoesNotExist:
+        return Response({'error': 'User not found'}, status=404)
     
     if request.method == 'GET':
-        # Send all task data to the frontend
-        tasks = Task.objects.filter(user=user).values('id', 'title', 'date', 'time', 'is_done')
-        return Response(list(tasks))
+        items = Cart.objects.filter(user=user).values(
+            'id', 'product__name', 'product__price', 'product__image_url', 'quantity'
+        )
+        return Response(list(items))
     
     if request.method == 'POST':
-        # Save the new task with date and time
-        Task.objects.create(
-            user=user,
-            title=request.data.get('title'),
-            date=request.data.get('date'),
-            time=request.data.get('time'),
-            is_done=False
-        )
-        return Response({'message': 'Added successfully!'})
+        product_id = request.data.get('product_id')
+        product = Product.objects.get(id=product_id)
+        cart_item, created = Cart.objects.get_or_create(user=user, product=product)
+        if not created:
+            cart_item.quantity += 1
+            cart_item.save()
+        return Response({'message': 'Added to cart'})
 
-@api_view(['PUT', 'DELETE'])
-def task_detail(request, task_id):
-    try:
-        task = Task.objects.get(id=task_id)
-    except Task.DoesNotExist:
-        return Response(status=404)
-
-    if request.method == 'PUT':
-        # This handles marking a task as DONE
-        task.is_done = request.data.get('is_done', task.is_done)
-        # It also handles editing the title/time if you want later
-        if 'title' in request.data: task.title = request.data['title']
-        task.save()
-        return Response({'message': 'Updated!'})
-
-    if request.method == 'DELETE':
-        task.delete()
-        return Response({'message': 'Deleted!'})
+@api_view(['POST', 'GET'])
+def manage_orders(request, username):
+    user = CustomUser.objects.get(username=username)
+    if request.method == 'POST':
+        cart_items = Cart.objects.filter(user=user)
+        if not cart_items.exists():
+            return Response({'error': 'Cart is empty'}, status=400)
+            
+        total = sum(item.product.price * item.quantity for item in cart_items)
+        Order.objects.create(user=user, total_price=total)
+        cart_items.delete()
+        return Response({'message': 'Order placed!'})
+    
+    orders = Order.objects.filter(user=user).values()
+    return Response(list(orders))

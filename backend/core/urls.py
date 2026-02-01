@@ -4,9 +4,12 @@ from accounts import views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    # Authentication
     path('api/register/', views.register_user),
-    path('api/login/', views.login_user),
     path('api/verify/<str:token>/', views.verify_email),
-    path('api/tasks/<str:username>/', views.handle_tasks),
-    path('api/tasks/detail/<int:task_id>/', views.task_detail), # Important for PUT/DELETE
+    path('api/login/', views.login_user),
+    # Shop Logic
+    path('api/products/', views.get_products),
+    path('api/cart/<str:username>/', views.manage_cart),
+    path('api/orders/<str:username>/', views.manage_orders),
 ]
