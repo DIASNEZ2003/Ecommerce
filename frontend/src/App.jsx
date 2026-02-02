@@ -13,7 +13,7 @@ const Verify = () => {
   const { token } = useParams();
   const navigate = useNavigate();
   useEffect(() => {
-    axios.get(`http://127.0.0.1:8000/api/verify/${token}/`).then(() => navigate('/login'));
+  axios.get('/api/verify/${token}/').then(() => navigate('/login'));
   }, [token]);
   return <div className="min-h-screen flex items-center justify-center">Activating...</div>;
 };
