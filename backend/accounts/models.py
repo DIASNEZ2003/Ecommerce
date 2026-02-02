@@ -6,10 +6,21 @@ class CustomUser(AbstractUser):
     auth_token = models.CharField(max_length=100, blank=True)
 
 class Product(models.Model):
+    CATEGORY_CHOICES = [
+        ('Foods', 'Foods'),
+        ('Items', 'Items'),
+        ('Gadgets', 'Gadgets'),
+        ('Furnitures', 'Furnitures'),
+        ('Accessories', 'Accessories'),
+        ('Clothes', 'Clothes'),
+        ('Others', 'Others'),
+    ]
+    
     seller = models.ForeignKey(CustomUser, on_delete=models.CASCADE, null=True, blank=True)
     name = models.CharField(max_length=255)
     description = models.TextField()
-    price = models.FloatField(default=0.0) # CHANGED TO FLOAT
+    category = models.CharField(max_length=50, choices=CATEGORY_CHOICES, default='Others') 
+    price = models.FloatField(default=0.0)
     image = models.ImageField(upload_to='products/', null=True, blank=True)
     stock = models.IntegerField(default=10)
 
@@ -21,7 +32,7 @@ class Cart(models.Model):
 class Order(models.Model):
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
     product = models.ForeignKey(Product, on_delete=models.CASCADE, null=True, blank=True)
-    total_price = models.FloatField(default=0.0) # CHANGED TO FLOAT
+    total_price = models.FloatField(default=0.0)
     created_at = models.DateTimeField(auto_now_add=True)
     status = models.CharField(max_length=50, default="Paid")
     rating = models.IntegerField(default=5)

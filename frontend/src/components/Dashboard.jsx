@@ -7,29 +7,37 @@ import {
 } from 'lucide-react';
 
 const API = "http://127.0.0.1:8000/api";
+const categories = ["All", "Foods", "Items", "Gadgets", "Furnitures", "Accessories", "Clothes", "Others"];
 
 export default function Dashboard({ user, onLogout }) {
   const [activeTab, setActiveTab] = useState('home');
+  const [selectedCategory, setSelectedCategory] = useState("All");
   const [products, setProducts] = useState([]);
   const [cart, setCart] = useState([]);
   const [orders, setOrders] = useState([]);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [statusModal, setStatusModal] = useState({ show: false, msg: '', type: 'success' });
   const [confirmModal, setConfirmModal] = useState({ show: false, msg: '', onConfirm: null });
-  const [editProduct, setEditProduct] = useState(null);
+  const [editProduct, setEditProduct] = useState(null); // State for the product being edited
 
   const [searchQuery, setSearchQuery] = useState("");
   const [userRating, setUserRating] = useState(5);
   const [userComment, setUserComment] = useState("");
   const [imageFile, setImageFile] = useState(null);
-  const [newProduct, setNewProduct] = useState({ name: '', description: '', price: '', stock: 10 });
+  const [newProduct, setNewProduct] = useState({ name: '', description: '', price: '', stock: 10, category: 'Others' });
 
   useEffect(() => { fetchAll(); }, [user]);
 
   const fetchAll = () => { fetchProducts(); fetchCart(); fetchOrders(); };
   const showStatus = (msg, type = 'success') => setStatusModal({ show: true, msg, type });
   
-  const fetchProducts = async () => { try { const res = await axios.get(`${API}/products/`); setProducts(res.data); } catch(e){} };
+  const fetchProducts = async () => { 
+    try { 
+      const res = await axios.get(`${API}/products/`); 
+      setProducts(res.data); 
+    } catch(e){} 
+  };
+  
   const fetchCart = async () => { try { const res = await axios.get(`${API}/cart/${user}/`); setCart(res.data); } catch(e){} };
   const fetchOrders = async () => { try { const res = await axios.get(`${API}/orders/${user}/`); setOrders(res.data); } catch(e){} };
 
@@ -72,12 +80,15 @@ export default function Dashboard({ user, onLogout }) {
     });
   };
 
+  // Fixed Update Logic
   const handleUpdate = async (e) => {
     e.preventDefault();
     try {
       await axios.put(`${API}/products/${editProduct.id}/`, editProduct);
-      setEditProduct(null); showStatus("Updated!"); fetchProducts();
-    } catch (err) { showStatus("Failed", "error"); }
+      setEditProduct(null); 
+      showStatus("Product Updated!"); 
+      fetchProducts();
+    } catch (err) { showStatus("Update Failed", "error"); }
   };
 
   const handleAddProduct = async (e) => {
@@ -85,6 +96,7 @@ export default function Dashboard({ user, onLogout }) {
     const data = new FormData();
     data.append('name', newProduct.name); 
     data.append('description', newProduct.description);
+    data.append('category', newProduct.category);
     data.append('price', newProduct.price); 
     data.append('stock', newProduct.stock);
     data.append('username', user); 
@@ -92,7 +104,7 @@ export default function Dashboard({ user, onLogout }) {
     
     await axios.post(`${API}/products/`, data);
     showStatus("Product Listed!"); 
-    setNewProduct({ name: '', description: '', price: '', stock: 10 });
+    setNewProduct({ name: '', description: '', price: '', stock: 10, category: 'Others' });
     setImageFile(null); 
     fetchProducts();
   };
@@ -107,13 +119,17 @@ export default function Dashboard({ user, onLogout }) {
     </div>
   );
 
-  const availableProducts = products.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
+  const availableProducts = products.filter(p => {
+    const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory = selectedCategory === "All" || p.category === selectedCategory;
+    return matchesSearch && matchesCategory;
+  });
+
   const myProducts = products.filter(p => p.seller === user);
   const totalSpent = Array.isArray(orders) ? orders.reduce((sum, o) => sum + parseFloat(o.total_price || 0), 0).toFixed(2) : "0.00";
 
   return (
     <div className="flex h-screen bg-[#fffafa] text-slate-900 overflow-hidden font-sans">
-      {/* SIDEBAR */}
       <div className="w-64 bg-[#0a0a0c] text-white flex flex-col shadow-2xl relative z-10">
         <div className="p-8 text-2xl font-black text-[#db2777] italic tracking-tighter uppercase text-center">HEX<span className="text-white">SHOP</span></div>
         <nav className="flex-1 px-4 space-y-1 mt-4">
@@ -128,7 +144,6 @@ export default function Dashboard({ user, onLogout }) {
       </div>
 
       <div className="flex-1 overflow-y-auto p-10 bg-white shadow-inner">
-        {/* TOP SEARCH */}
         <div className="flex justify-between items-center mb-10">
           <h1 className="text-xl font-black uppercase tracking-tight text-slate-800">{activeTab === 'home' ? "Discover" : activeTab.toUpperCase()}</h1>
           <div className="border-2 border-pink-100 bg-white rounded-xl flex items-center px-4 py-2 focus-within:border-pink-500 transition-all">
@@ -137,16 +152,31 @@ export default function Dashboard({ user, onLogout }) {
           </div>
         </div>
 
-        {/* MARKET FEED */}
         {activeTab === 'home' && (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-            {availableProducts.map(p => (
-              <ProductCard key={p.id} p={p} onBuy={() => handleBuyMarket(p)} onCart={() => handleAddToCart(p)} onDetail={() => setSelectedProduct(p)} rating={p.reviews?.length > 0 ? <Stars count={p.avg_rating}/> : null} />
-            ))}
-          </div>
+          <>
+            <div className="flex flex-wrap gap-2 mb-8 overflow-x-auto pb-2 no-scrollbar">
+              {categories.map(cat => (
+                <button
+                  key={cat}
+                  onClick={() => setSelectedCategory(cat)}
+                  className={`px-5 py-2 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all ${
+                    selectedCategory === cat 
+                    ? 'bg-[#db2777] text-white shadow-lg scale-105' 
+                    : 'bg-white text-slate-400 border-2 border-pink-50 hover:border-pink-200'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+              {availableProducts.map(p => (
+                <ProductCard key={p.id} p={p} onBuy={() => handleBuyMarket(p)} onCart={() => handleAddToCart(p)} onDetail={() => setSelectedProduct(p)} rating={p.reviews?.length > 0 ? <Stars count={p.avg_rating}/> : null} />
+              ))}
+            </div>
+          </>
         )}
 
-        {/* MY SHOP SECTION */}
         {activeTab === 'products' && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
             <div className="lg:col-span-4 space-y-6">
@@ -159,28 +189,29 @@ export default function Dashboard({ user, onLogout }) {
                   <form onSubmit={handleAddProduct} className="space-y-3">
                     <input type="text" placeholder="Name" className="w-full p-3 border-2 border-pink-100 bg-white rounded-xl text-[10px] font-bold focus:border-pink-500 outline-none" value={newProduct.name} onChange={e => setNewProduct({...newProduct, name: e.target.value})} required />
                     <textarea placeholder="Description" className="w-full p-3 border-2 border-pink-100 bg-white rounded-xl text-[10px] font-bold h-20 resize-none focus:border-pink-500 outline-none" value={newProduct.description} onChange={e => setNewProduct({...newProduct, description: e.target.value})} required />
+                    <select 
+                      className="w-full p-3 border-2 border-pink-100 bg-white rounded-xl text-[10px] font-bold outline-none focus:border-pink-500 appearance-none"
+                      value={newProduct.category}
+                      onChange={e => setNewProduct({...newProduct, category: e.target.value})}
+                      required
+                    >
+                      {categories.filter(c => c !== "All").map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
                     <div className="flex gap-2">
                       <input type="number" placeholder="Price" className="w-1/2 p-3 border-2 border-pink-100 bg-white rounded-xl text-[10px] font-bold focus:border-pink-500" value={newProduct.price} onChange={e => setNewProduct({...newProduct, price: e.target.value})} required />
                       <input type="number" placeholder="Stock" className="w-1/2 p-3 border-2 border-pink-100 bg-white rounded-xl text-[10px] font-bold focus:border-pink-500" value={newProduct.stock} onChange={e => setNewProduct({...newProduct, stock: e.target.value})} required />
                     </div>
-                    
-                    {/* BACK IN THE CODE: PICTURE UPLOAD BOX */}
-                    <div 
-                      className="border-2 border-dashed border-pink-200 p-6 rounded-2xl text-center bg-pink-50/10 cursor-pointer hover:bg-pink-50 transition-all group"
-                      onClick={() => document.getElementById('imageInput').click()}
-                    >
+                    <div className="border-2 border-dashed border-pink-200 p-6 rounded-2xl text-center bg-pink-50/10 cursor-pointer hover:bg-pink-50 transition-all group" onClick={() => document.getElementById('imageInput').click()}>
                       <input type="file" id="imageInput" className="hidden" accept="image/*" onChange={e => setImageFile(e.target.files[0])} />
                       <ImagePlus size={24} className="mx-auto text-pink-300 group-hover:text-pink-500 mb-2"/>
-                      <span className="text-[9px] font-black text-pink-400 uppercase tracking-tighter">
-                        {imageFile ? imageFile.name : "Select Product Photo"}
-                      </span>
+                      <span className="text-[9px] font-black text-pink-400 uppercase tracking-tighter">{imageFile ? imageFile.name : "Select Product Photo"}</span>
                     </div>
-
                     <button type="submit" className="w-full bg-[#0a0a0c] text-white py-3.5 rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-[#db2777] active:scale-95 transition-all">List to Market</button>
                   </form>
                </div>
             </div>
-            
             <div className="lg:col-span-8 grid grid-cols-2 md:grid-cols-3 gap-6 h-fit">
               {myProducts.map(p => (
                 <div key={p.id} className="bg-white rounded-[24px] border-2 border-pink-50 p-2 shadow-sm group">
@@ -191,7 +222,8 @@ export default function Dashboard({ user, onLogout }) {
                       <p className="text-[8px] font-bold text-pink-400">QTY: {p.stock}</p>
                     </div>
                     <div className="flex gap-1">
-                      <button onClick={() => setEditProduct(p)} className="p-1.5 bg-pink-50 text-pink-600 rounded-lg hover:bg-pink-600 hover:text-white transition-all"><Edit3 size={10}/></button>
+                      {/* Fixed Edit Button Call */}
+                      <button onClick={() => setEditProduct({...p})} className="p-1.5 bg-pink-50 text-pink-600 rounded-lg hover:bg-pink-600 hover:text-white transition-all"><Edit3 size={10}/></button>
                       <button onClick={() => handleDeleteProduct(p.id)} className="p-1.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-600 hover:text-white transition-all"><Trash2 size={10}/></button>
                     </div>
                   </div>
@@ -201,7 +233,7 @@ export default function Dashboard({ user, onLogout }) {
           </div>
         )}
 
-        {/* BASKET / CART */}
+        {/* --- CART AND ORDERS TABS REMAIN THE SAME --- */}
         {activeTab === 'cart' && (
           <div className="max-w-4xl mx-auto bg-white rounded-[32px] border-2 border-pink-50 shadow-xl overflow-hidden text-[10px]">
             <table className="w-full text-left">
@@ -227,7 +259,6 @@ export default function Dashboard({ user, onLogout }) {
           </div>
         )}
 
-        {/* HISTORY */}
         {activeTab === 'orders' && (
           <div className="max-w-4xl mx-auto space-y-3">
             {orders.map(o => (
@@ -245,6 +276,29 @@ export default function Dashboard({ user, onLogout }) {
 
       {/* --- MODALS --- */}
 
+      {/* FIXED EDIT MODAL UI */}
+      {editProduct && (
+        <div className="fixed inset-0 z-[700] flex items-center justify-center bg-black/60 backdrop-blur-md p-6">
+          <div className="bg-white rounded-[40px] p-10 max-w-md w-full shadow-2xl border-4 border-pink-100 relative">
+            <button onClick={() => setEditProduct(null)} className="absolute top-6 right-6 text-slate-300 hover:text-pink-500"><X size={24}/></button>
+            <h2 className="text-xl font-black uppercase text-slate-800 mb-6">Edit Product</h2>
+            <form onSubmit={handleUpdate} className="space-y-4">
+              <input type="text" className="w-full p-4 border-2 border-pink-50 rounded-2xl text-[10px] font-bold focus:border-pink-500 outline-none" value={editProduct.name} onChange={e => setEditProduct({...editProduct, name: e.target.value})} placeholder="Name" required />
+              <textarea className="w-full p-4 border-2 border-pink-50 rounded-2xl text-[10px] font-bold h-24 resize-none outline-none focus:border-pink-500" value={editProduct.description} onChange={e => setEditProduct({...editProduct, description: e.target.value})} placeholder="Description" required />
+              <select className="w-full p-4 border-2 border-pink-50 rounded-2xl text-[10px] font-bold outline-none focus:border-pink-500" value={editProduct.category} onChange={e => setEditProduct({...editProduct, category: e.target.value})}>
+                {categories.filter(c => c !== "All").map(cat => <option key={cat} value={cat}>{cat}</option>)}
+              </select>
+              <div className="flex gap-3">
+                <input type="number" className="w-1/2 p-4 border-2 border-pink-50 rounded-2xl text-[10px] font-bold focus:border-pink-500 outline-none" value={editProduct.price} onChange={e => setEditProduct({...editProduct, price: e.target.value})} placeholder="Price" required />
+                <input type="number" className="w-1/2 p-4 border-2 border-pink-50 rounded-2xl text-[10px] font-bold focus:border-pink-500 outline-none" value={editProduct.stock} onChange={e => setEditProduct({...editProduct, stock: e.target.value})} placeholder="Stock" required />
+              </div>
+              <button type="submit" className="w-full bg-[#db2777] text-white py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-slate-900 transition-all shadow-lg mt-2">Save Changes</button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm Modal */}
       {confirmModal.show && (
         <div className="fixed inset-0 z-[500] flex items-center justify-center bg-black/60 backdrop-blur-md p-6">
           <div className="bg-white rounded-[32px] p-8 max-w-sm w-full text-center shadow-2xl border-4 border-pink-100">
@@ -254,6 +308,7 @@ export default function Dashboard({ user, onLogout }) {
         </div>
       )}
 
+      {/* Status Modal */}
       {statusModal.show && (
         <div className="fixed inset-0 z-[600] flex items-center justify-center bg-black/60 backdrop-blur-sm p-6">
           <div className="bg-white rounded-[32px] p-8 max-w-sm w-full text-center shadow-2xl border-4 border-pink-100">
@@ -264,6 +319,7 @@ export default function Dashboard({ user, onLogout }) {
         </div>
       )}
 
+      {/* Detail Modal */}
       {selectedProduct && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#0a0a0c]/80 backdrop-blur-md p-6">
           <div className="bg-white w-full max-w-sm rounded-[64px] p-10 relative shadow-2xl border-4 border-pink-100 flex flex-col items-center text-center">

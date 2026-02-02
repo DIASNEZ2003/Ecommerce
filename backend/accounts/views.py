@@ -1,6 +1,7 @@
 import uuid
 from django.conf import settings
-from django.core.mail import send_mail
+from django.core.mail import EmailMultiAlternatives # Added for styled email
+from django.utils.html import strip_tags # Added to create a text-only backup
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
 from django.contrib.auth import authenticate
@@ -22,12 +23,49 @@ def register_user(request):
         token = str(uuid.uuid4())
         user.auth_token = token
         user.save()
-        send_mail(
-            "Verify Your HexShop Account", 
-            f"Click here: http://localhost:5173/verify/{token}", 
+
+        # HTML Design for the Gmail activation email
+        subject = "Verify Your HexShop Account"
+        verify_link = f"http://localhost:5173/verify/{token}"
+        
+        html_content = f"""
+        <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: auto; border: 1px solid #e0e0e0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
+            <div style="background-color: #4F46E5; padding: 30px; text-align: center;">
+                <h1 style="color: #ffffff; margin: 0; font-size: 28px; letter-spacing: 1px;">HexShop</h1>
+            </div>
+            <div style="padding: 40px 30px; background-color: #ffffff; text-align: center;">
+                <h2 style="color: #1F2937; margin-bottom: 20px;">Welcome to the Community!</h2>
+                <p style="color: #4B5563; font-size: 16px; line-height: 1.6; margin-bottom: 30px;">
+                    Hi <strong>{user.username}</strong>, we're excited to have you. Please verify your email address to activate your account and start exploring our market.
+                </p>
+                <a href="{verify_link}" 
+                   style="display: inline-block; padding: 14px 30px; background-color: #4F46E5; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; transition: background-color 0.3s ease;">
+                   Verify Account
+                </a>
+                <p style="color: #9CA3AF; font-size: 13px; margin-top: 40px; border-top: 1px solid #f3f4f6; padding-top: 20px;">
+                    If the button above doesn't work, copy and paste this link into your browser:<br>
+                    <span style="color: #4F46E5;">{verify_link}</span>
+                </p>
+            </div>
+            <div style="background-color: #F9FAFB; padding: 20px; text-align: center; border-top: 1px solid #e0e0e0;">
+                <p style="color: #6B7280; font-size: 12px; margin: 0;">&copy; 2024 HexShop Inc. All rights reserved.</p>
+            </div>
+        </div>
+        """
+        
+        # Create a plain-text version for email clients that don't support HTML
+        text_content = strip_tags(html_content) 
+
+        # Using EmailMultiAlternatives instead of send_mail for HTML support
+        msg = EmailMultiAlternatives(
+            subject, 
+            text_content, 
             settings.EMAIL_HOST_USER, 
             [data['email']]
         )
+        msg.attach_alternative(html_content, "text/html")
+        msg.send()
+
         return Response({'message': 'Check Gmail to verify!'}, status=201)
     except Exception as e:
         return Response({'error': str(e)}, status=400)
@@ -56,11 +94,14 @@ def login_user(request):
 @api_view(['GET', 'POST', 'PUT', 'DELETE'])
 def get_products(request, pk=None):
     if request.method == 'GET':
-        # Get all products regardless of stock so they show up immediately
-        products = Product.objects.all()
+        category_filter = request.query_params.get('category')
+        if category_filter and category_filter != "All":
+            products = Product.objects.filter(category=category_filter)
+        else:
+            products = Product.objects.all()
+
         data = []
         for p in products:
-            # Safe conversion to float for the frontend
             try:
                 price_val = float(p.price)
             except:
@@ -73,6 +114,7 @@ def get_products(request, pk=None):
                 "id": p.id,
                 "name": p.name,
                 "description": p.description,
+                "category": p.category, 
                 "price": price_val,
                 "seller": p.seller.username if p.seller else "Admin",
                 "stock": p.stock,
@@ -89,6 +131,7 @@ def get_products(request, pk=None):
                 seller=seller,
                 name=request.data.get('name'),
                 description=request.data.get('description'),
+                category=request.data.get('category', 'Others'),
                 price=float(request.data.get('price', 0)),
                 image=request.FILES.get('image'),
                 stock=int(request.data.get('stock', 10))
@@ -104,6 +147,7 @@ def get_products(request, pk=None):
             p.price = float(request.data.get('price', p.price))
             p.stock = int(request.data.get('stock', p.stock))
             p.description = request.data.get('description', p.description)
+            p.category = request.data.get('category', p.category)
             p.save()
             return Response({"message": "Updated!"})
         except:
@@ -159,7 +203,6 @@ def manage_orders(request, username):
         rating = request.data.get('rating', 5)
         comment = request.data.get('comment', "")
 
-        # Buy specific item from detail modal
         if p_id:
             p = Product.objects.get(id=p_id)
             if p.stock > 0:
@@ -172,7 +215,6 @@ def manage_orders(request, username):
                 return Response({'message': 'Order success'})
             return Response({'error': 'Out of stock'}, status=400)
         
-        # Checkout entire cart
         else:
             cart = Cart.objects.filter(user=user)
             for i in cart:
@@ -185,7 +227,6 @@ def manage_orders(request, username):
             cart.delete()
             return Response({'message': 'Checkout success'})
 
-    # Get Purchase History
     orders = Order.objects.filter(user=user).order_by('-created_at')
     return Response([{
         "id": o.id, 
