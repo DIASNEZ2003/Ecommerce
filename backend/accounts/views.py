@@ -26,7 +26,7 @@ def register_user(request):
 
         # HTML Design for the Gmail activation email
         subject = "Verify Your HexShop Account"
-        verify_link = f"https://hexshop-8ey3akuns-venjos-projects.vercel.app/verify/{token}"
+        verify_link = f"https://hexshop-xi.vercel.app/verify/{token}"
         
         html_content = f"""
         <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: auto; border: 1px solid #e0e0e0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
