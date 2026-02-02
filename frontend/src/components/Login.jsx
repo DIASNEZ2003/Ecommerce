@@ -3,7 +3,7 @@ import axios from 'axios';
 import { useNavigate, Link } from 'react-router-dom';
 import { User, Lock, ArrowRight, ShieldCheck } from 'lucide-react';
 
-const API = "http://127.0.0.1:8000/api";
+const API = "https://hexshop-xi.vercel.app/api";
 
 export default function Login({ setUser }) {
   const [form, setForm] = useState({ username: '', password: '' });
