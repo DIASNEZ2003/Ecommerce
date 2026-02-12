@@ -4,7 +4,7 @@ from django.core.mail import send_mail
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
 from django.contrib.auth import authenticate
-from .models import CustomUser, Product, Cart, Order
+from .models import CustomUser, Product, Cart, Order, Notification 
 from django.db.models import Avg
 
 # --- 1. AUTHENTICATION (Login, Register, Verify) ---
@@ -56,7 +56,6 @@ def login_user(request):
 @api_view(['GET', 'POST', 'PUT', 'DELETE'])
 def get_products(request, pk=None):
     if request.method == 'GET':
-        # ADDED: Logic to handle category filtering from the frontend
         category_filter = request.query_params.get('category')
         if category_filter and category_filter != "All":
             products = Product.objects.filter(category=category_filter)
@@ -73,14 +72,28 @@ def get_products(request, pk=None):
             reviews = Order.objects.filter(product=p).exclude(comment__isnull=True)
             avg = reviews.aggregate(Avg('rating'))['rating__avg'] or 0
             
+            # --- NEW: FINANCE & SALES HISTORY LOGIC ---
+            # Fetch all orders for this specific product to see who bought it
+            sales_records = Order.objects.filter(product=p).order_by('-created_at')
+            sales_count = sales_records.count()
+            
             data.append({
                 "id": p.id,
                 "name": p.name,
                 "description": p.description,
-                "category": p.category, # ADDED: include category in response
+                "category": p.category, 
                 "price": price_val,
                 "seller": p.seller.username if p.seller else "Admin",
                 "stock": p.stock,
+                "sales_count": sales_count,
+                # Include a list of buyers for the "Sold by Who" section
+                "sales_history": [
+                    {
+                        "buyer": s.user.username, 
+                        "amount": float(s.total_price), 
+                        "date": s.created_at.strftime("%b %d, %Y")
+                    } for s in sales_records
+                ],
                 "avg_rating": round(float(avg), 1),
                 "image": request.build_absolute_uri(p.image.url) if p.image else None,
                 "reviews": [{"user": r.user.username, "rating": r.rating, "comment": r.comment} for r in reviews]
@@ -94,7 +107,7 @@ def get_products(request, pk=None):
                 seller=seller,
                 name=request.data.get('name'),
                 description=request.data.get('description'),
-                category=request.data.get('category', 'Others'), # ADDED: save category
+                category=request.data.get('category', 'Others'), 
                 price=float(request.data.get('price', 0)),
                 image=request.FILES.get('image'),
                 stock=int(request.data.get('stock', 10))
@@ -110,7 +123,7 @@ def get_products(request, pk=None):
             p.price = float(request.data.get('price', p.price))
             p.stock = int(request.data.get('stock', p.stock))
             p.description = request.data.get('description', p.description)
-            p.category = request.data.get('category', p.category) # ADDED: update category
+            p.category = request.data.get('category', p.category) 
             p.save()
             return Response({"message": "Updated!"})
         except:
@@ -152,7 +165,29 @@ def manage_cart(request, username):
         Cart.objects.filter(id=request.data.get('cart_item_id'), user=user).delete()
         return Response({'message': 'Removed'})
 
-# --- 4. ORDERS & REVIEWS ---
+# --- 4. NOTIFICATION VIEW ---
+
+@api_view(['GET', 'POST'])
+def manage_notifications(request, username):
+    try:
+        user = CustomUser.objects.get(username=username)
+    except CustomUser.DoesNotExist:
+        return Response({'error': 'User not found'}, status=404)
+
+    if request.method == 'GET':
+        notifications = Notification.objects.filter(user=user).order_by('-created_at')
+        return Response([{
+            "id": n.id,
+            "message": n.message,
+            "is_read": n.is_read,
+            "created_at": n.created_at.strftime("%b %d, %I:%M %p")
+        } for n in notifications])
+
+    if request.method == 'POST':
+        Notification.objects.filter(user=user, is_read=False).update(is_read=True)
+        return Response({"message": "Marked as read"})
+
+# --- 5. ORDERS & REVIEWS ---
 
 @api_view(['POST', 'GET'])
 def manage_orders(request, username):
@@ -175,6 +210,14 @@ def manage_orders(request, username):
                     user=user, product=p, total_price=p.price, 
                     rating=rating, comment=comment
                 )
+                
+                # Notify Seller
+                if p.seller and p.seller != user:
+                    Notification.objects.create(
+                        user=p.seller,
+                        message=f"💰 {user.username} bought your item: {p.name}!"
+                    )
+                
                 return Response({'message': 'Order success'})
             return Response({'error': 'Out of stock'}, status=400)
         
@@ -187,6 +230,14 @@ def manage_orders(request, username):
                     user=user, product=i.product, 
                     total_price=i.product.price * i.quantity, rating=5
                 )
+                
+                # Notify Seller for cart items
+                if i.product.seller and i.product.seller != user:
+                    Notification.objects.create(
+                        user=i.product.seller,
+                        message=f"🛍️ {user.username} bought {i.quantity}x {i.product.name} from you!"
+                    )
+                    
             cart.delete()
             return Response({'message': 'Checkout success'})
 
